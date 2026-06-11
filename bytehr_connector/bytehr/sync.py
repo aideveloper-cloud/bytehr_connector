@@ -8,17 +8,26 @@ ByteHR -> ERPNext:
     They are NOT posted as ERPNext Timesheets yet — attaching hours to the
     right Project needs a mapping decision first.
 
-Request budget per daily run (120 staff, limit=100/page):
-  employees ~2 calls + timesheets ~3 calls -> ~150 calls/month of the
+Request budget per daily run (191 staff, limit=100/page, verified live):
+  employees 2 calls + timesheets 1-2 calls -> ~120 calls/month of the
   1,000/month cap. See client.py for the hard budget guard.
+
+Verified against the live API (2026-06-11):
+  - records sit in body["data"] (array), envelope has currentPage/limit/total
+  - employee key field is employeeID (e.g. "58001"), plus systemID
+  - /api/timesheets REQUIRES startDate + endDate and has no row id —
+    rows are keyed by employeeID + dateOfWork
 
 Extra Site Config keys (besides the client.py ones):
   bytehr_pull_timesheets -> 1 to also mirror timesheets (off by default)
   bytehr_pull_pages      -> pages per endpoint per run (default 3;
                             raise temporarily for the first backfill)
+  bytehr_timesheet_days  -> how many days back each run covers (default 3)
 """
 
 import frappe
+from frappe.utils import add_days, nowdate
+
 from bytehr_connector.bytehr import client
 
 
@@ -54,7 +63,12 @@ def pull_employees(max_pages=3):
 
 
 def pull_timesheets(max_pages=3):
-    for record in client.iter_list("/api/timesheets", max_pages=max_pages):
+    days = int(frappe.conf.get("bytehr_timesheet_days") or 3)
+    params = {
+        "startDate": add_days(nowdate(), -days),
+        "endDate": nowdate(),
+    }
+    for record in client.iter_list("/api/timesheets", max_pages=max_pages, params=params):
         _upsert_timesheet(record)
 
 
@@ -66,18 +80,21 @@ def _pick(record, *keys):
 
 
 def _employee_id(record):
-    value = _pick(record, "id", "Id", "employeeId", "EmployeeId", "employee_id",
-                  "code", "Code", "employeeCode", "EmployeeCode")
+    value = _pick(record, "employeeID", "employeeId", "employee_id", "systemID", "id")
     return str(value) if value else ""
 
 
 def _employee_name(record):
-    full = str(_pick(record, "name", "Name", "fullName", "FullName")).strip()
-    if full:
-        return full
-    first = str(_pick(record, "firstName", "FirstName", "first_name")).strip()
-    last = str(_pick(record, "lastName", "LastName", "last_name")).strip()
-    return f"{first} {last}".strip()
+    # Prefer Thai names (the working language); ByteHR uses "-"/"." fillers.
+    first = str(_pick(record, "firstNameThai", "firstName", "first_name")).strip()
+    last = str(_pick(record, "lastNameThai", "lastName", "last_name")).strip()
+    parts = [p for p in (first, last) if p and p not in ("-", ".")]
+    return " ".join(parts)
+
+
+def _last_name(record):
+    last = str(_pick(record, "lastNameThai", "lastName", "last_name")).strip()
+    return last if last not in ("", "-", ".") else None
 
 
 def _upsert_employee(record):
@@ -99,8 +116,13 @@ def _upsert_employee(record):
         return
 
     employee = frappe.new_doc("Employee")
-    employee.first_name = str(_pick(record, "firstName", "FirstName", "first_name") or full_name).strip()
-    employee.last_name = str(_pick(record, "lastName", "LastName", "last_name")).strip() or None
+    employee.first_name = str(_pick(record, "firstNameThai", "firstName") or full_name).strip()
+    employee.last_name = _last_name(record)
+    employee.employee_number = bytehr_id
+    employee.gender = _gender(record)
+    employee.date_of_birth = str(record.get("birthDate") or "")[:10] or None
+    employee.personal_email = record.get("email") or None
+    employee.cell_number = record.get("phone") or None
     employee.status = "Active"
     employee.company = frappe.defaults.get_global_default("company")
     employee.bytehr_employee_id = bytehr_id
@@ -108,18 +130,50 @@ def _upsert_employee(record):
     employee.insert(ignore_mandatory=True)
 
 
+def _gender(record):
+    # ByteHR sends bilingual values like "ชาย/Male", "หญิง/Female".
+    raw = str(record.get("gender") or "")
+    if "Male" in raw and "Female" not in raw:
+        return "Male"
+    if "Female" in raw:
+        return "Female"
+    return None
+
+
+def _time_part(value):
+    value = str(value or "")
+    return value[11:16] if "T" in value else value
+
+
+def _day_status(record):
+    if record.get("absent"):
+        return "Absent"
+    if record.get("leave"):
+        return f"Leave: {record.get('leaveName') or ''}".strip(": ")
+    if record.get("holiday"):
+        return "Holiday"
+    if record.get("dayOff"):
+        return "Day Off"
+    return "Worked"
+
+
 def _upsert_timesheet(record):
-    bytehr_id = str(_pick(record, "id", "Id", "timesheetId", "TimesheetId", "timesheet_id") or "")
-    if not bytehr_id:
+    # No row id in /api/timesheets — one row per employee per day.
+    employee_id = _employee_id(record)
+    work_date = str(record.get("dateOfWork") or "")[:10]
+    if not employee_id or not work_date:
         return
+    bytehr_id = f"{employee_id}-{work_date}"
 
     values = {
-        "bytehr_employee_id": _employee_id(record),
+        "bytehr_employee_id": employee_id,
         "employee_name": _employee_name(record),
-        "date": str(_pick(record, "date", "Date", "workDate", "WorkDate"))[:10] or None,
-        "clock_in": str(_pick(record, "clockIn", "ClockIn", "checkIn", "CheckIn")),
-        "clock_out": str(_pick(record, "clockOut", "ClockOut", "checkOut", "CheckOut")),
-        "hours": float(_pick(record, "hours", "Hours", "totalHours", "TotalHours") or 0),
+        "date": work_date,
+        "clock_in": _time_part(record.get("signIn")),
+        "clock_out": _time_part(record.get("signOut")),
+        "hours": float(record.get("regularHours") or 0),
+        "ot_hours": float(record.get("totalOTHours") or 0),
+        "day_status": _day_status(record),
         "payload": frappe.as_json(record),
         "last_synced": frappe.utils.now(),
     }

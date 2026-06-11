@@ -12,6 +12,8 @@
   "clock_in",
   "clock_out",
   "hours",
+  "ot_hours",
+  "day_status",
   "last_synced",
   "payload"
  ],
@@ -63,8 +65,22 @@
   {
    "fieldname": "hours",
    "fieldtype": "Float",
-   "label": "Hours",
+   "label": "Regular Hours",
    "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "ot_hours",
+   "fieldtype": "Float",
+   "label": "OT Hours",
+   "read_only": 1
+  },
+  {
+   "fieldname": "day_status",
+   "fieldtype": "Data",
+   "label": "Day Status",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "read_only": 1
   },
   {

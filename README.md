@@ -26,6 +26,7 @@ ByteHR ตัด API key ทันทีที่ครบ 1,000 requests แล
 | `bytehr_monthly_request_budget` | (ไม่บังคับ) ค่าเริ่มต้น `900` |
 | `bytehr_pull_timesheets` | `1` เมื่อต้องการดึงเวลาทำงานด้วย (ปิดไว้โดย default) |
 | `bytehr_pull_pages` | (ไม่บังคับ) หน้าต่อ endpoint ต่อรอบ ค่าเริ่มต้น `3` (×100 รายการ/หน้า) |
+| `bytehr_timesheet_days` | (ไม่บังคับ) ดึง timesheet ย้อนหลังกี่วันต่อรอบ ค่าเริ่มต้น `3` |
 
 ## ติดตั้ง (เหมือน flowaccount_connector)
 
@@ -39,9 +40,12 @@ ByteHR ตัด API key ทันทีที่ครบ 1,000 requests แล
 จำนวน request ที่ใช้ไปเดือนนี้เก็บใน DefaultValue key `bytehr_requests_YYYY-MM`
 (ดูผ่าน bench console: `frappe.db.get_default("bytehr_requests_2026-06")`)
 
-## หมายเหตุ field mapping
+## หมายเหตุ field mapping (เทียบกับ API จริงแล้ว 2026-06-11)
 
-โครงสร้าง response จริงของ ByteHR ยังไม่มีตัวอย่างสาธารณะ — โค้ด unwrap แบบ defensive
-(`data.list` / `data.items` / array ตรง ๆ) และเดาชื่อฟิลด์หลายแบบ (`id`/`employeeId`,
-`firstName`/`first_name`) **รอบแรกที่ได้ API key จริง ให้เทสแล้วปรับ mapping ให้ตรง**
-เหมือนที่ทำกับ FlowAccount connector
+- envelope: `{currentPage, limit, total, data: [...]}` — records อยู่ใน `data`
+- พนักงานใช้ `employeeID` (เช่น "58001") เป็น key, ชื่อใช้ไทยก่อน (`firstNameThai`)
+- `/api/timesheets` **บังคับส่ง `startDate` + `endDate`** และไม่มี row id —
+  ใช้ `employeeID + dateOfWork` เป็น key แทน (1 แถว/คน/วัน)
+- ข้อมูล timesheet มีครบ: สแกนเข้า-ออกจริง, ชั่วโมงปกติ, OT รวม, ขาด/ลา/วันหยุด
+- ข้อมูลอ่อนไหว (เลขบัญชีธนาคาร, เลขประกันสังคม, เลขบัตร) **ไม่ถูกเก็บ**ลง Employee —
+  มีเฉพาะใน payload ของ timesheet mirror ซึ่งไม่มี (payload พนักงานไม่ถูก mirror)
