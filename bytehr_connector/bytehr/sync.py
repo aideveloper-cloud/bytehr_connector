@@ -58,19 +58,25 @@ def pull_timesheets(max_pages=3):
         _upsert_timesheet(record)
 
 
-def _employee_id(record):
-    for key in ("id", "employeeId", "employee_id", "code", "employeeCode"):
+def _pick(record, *keys):
+    for key in keys:
         if record.get(key):
-            return str(record[key])
+            return record[key]
     return ""
 
 
+def _employee_id(record):
+    value = _pick(record, "id", "Id", "employeeId", "EmployeeId", "employee_id",
+                  "code", "Code", "employeeCode", "EmployeeCode")
+    return str(value) if value else ""
+
+
 def _employee_name(record):
-    full = (record.get("name") or record.get("fullName") or "").strip()
+    full = str(_pick(record, "name", "Name", "fullName", "FullName")).strip()
     if full:
         return full
-    first = (record.get("firstName") or record.get("first_name") or "").strip()
-    last = (record.get("lastName") or record.get("last_name") or "").strip()
+    first = str(_pick(record, "firstName", "FirstName", "first_name")).strip()
+    last = str(_pick(record, "lastName", "LastName", "last_name")).strip()
     return f"{first} {last}".strip()
 
 
@@ -93,8 +99,8 @@ def _upsert_employee(record):
         return
 
     employee = frappe.new_doc("Employee")
-    employee.first_name = (record.get("firstName") or record.get("first_name") or full_name).strip()
-    employee.last_name = (record.get("lastName") or record.get("last_name") or "").strip() or None
+    employee.first_name = str(_pick(record, "firstName", "FirstName", "first_name") or full_name).strip()
+    employee.last_name = str(_pick(record, "lastName", "LastName", "last_name")).strip() or None
     employee.status = "Active"
     employee.company = frappe.defaults.get_global_default("company")
     employee.bytehr_employee_id = bytehr_id
@@ -103,21 +109,17 @@ def _upsert_employee(record):
 
 
 def _upsert_timesheet(record):
-    bytehr_id = ""
-    for key in ("id", "timesheetId", "timesheet_id"):
-        if record.get(key):
-            bytehr_id = str(record[key])
-            break
+    bytehr_id = str(_pick(record, "id", "Id", "timesheetId", "TimesheetId", "timesheet_id") or "")
     if not bytehr_id:
         return
 
     values = {
-        "bytehr_employee_id": _employee_id(record) or str(record.get("employeeId") or ""),
+        "bytehr_employee_id": _employee_id(record),
         "employee_name": _employee_name(record),
-        "date": (record.get("date") or record.get("workDate") or "")[:10] or None,
-        "clock_in": record.get("clockIn") or record.get("checkIn") or "",
-        "clock_out": record.get("clockOut") or record.get("checkOut") or "",
-        "hours": float(record.get("hours") or record.get("totalHours") or 0),
+        "date": str(_pick(record, "date", "Date", "workDate", "WorkDate"))[:10] or None,
+        "clock_in": str(_pick(record, "clockIn", "ClockIn", "checkIn", "CheckIn")),
+        "clock_out": str(_pick(record, "clockOut", "ClockOut", "checkOut", "CheckOut")),
+        "hours": float(_pick(record, "hours", "Hours", "totalHours", "TotalHours") or 0),
         "payload": frappe.as_json(record),
         "last_synced": frappe.utils.now(),
     }

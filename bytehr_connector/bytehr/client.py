@@ -11,14 +11,19 @@ past a configurable budget so there is always headroom for manual testing.
 Site Config keys:
   bytehr_enabled                 -> 1 to turn the integration on
   bytehr_api_key                 -> API key from the Open API add-on
-  bytehr_api_base                -> base URL from ByteHR onboarding,
-                                    e.g. https://xxx.byte-hr.com (no public default)
+  bytehr_api_base                -> optional, defaults to
+                                    https://developer.byte-hr.com (probed live:
+                                    it answers /api/employees with the JSON
+                                    envelope {"StatusCode","Message","Data"})
   bytehr_monthly_request_budget  -> optional, default 900 (of the 1,000 cap)
 """
 
 import frappe
 import requests
 from frappe.utils import cint, nowdate
+
+
+DEFAULT_BASE = "https://developer.byte-hr.com"
 
 
 class BudgetExhausted(Exception):
@@ -48,10 +53,10 @@ def get(path, params=None):
             f"ByteHR monthly request budget reached ({used}/{budget()})"
         )
 
-    base = (_conf("bytehr_api_base") or "").rstrip("/")
+    base = (_conf("bytehr_api_base") or DEFAULT_BASE).rstrip("/")
     api_key = _conf("bytehr_api_key")
-    if not base or not api_key:
-        frappe.throw("Set bytehr_api_base and bytehr_api_key in Site Config")
+    if not api_key:
+        frappe.throw("Set bytehr_api_key in Site Config")
 
     frappe.db.set_default(_counter_key(), used + 1)
 
@@ -76,7 +81,8 @@ def iter_list(path, page_size=100, max_pages=5, params=None):
     """Yield records from a paginated endpoint (?limit=&currentpage=).
 
     limit maxes out at 100 per ByteHR docs — always use 100 to stretch the
-    monthly quota. Wrapper shape isn't documented, so unwrap defensively.
+    monthly quota. The error envelope is {"StatusCode","Message","Data"}
+    (PascalCase, probed live); unwrap both casings defensively.
     """
     page = 1
     while page <= max_pages:
@@ -84,9 +90,16 @@ def iter_list(path, page_size=100, max_pages=5, params=None):
         query.update({"limit": page_size, "currentpage": page})
         body = get(path, params=query)
 
-        data = body.get("data") if isinstance(body, dict) else body
+        data = body
+        if isinstance(body, dict):
+            data = body.get("Data") if body.get("Data") is not None else body.get("data")
         if isinstance(data, dict):
-            batch = data.get("list") or data.get("items") or data.get("records") or []
+            batch = (
+                data.get("list") or data.get("List")
+                or data.get("items") or data.get("Items")
+                or data.get("records") or data.get("Records")
+                or []
+            )
         else:
             batch = data or []
 

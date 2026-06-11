@@ -22,7 +22,7 @@ ByteHR ตัด API key ทันทีที่ครบ 1,000 requests แล
 |---|---|
 | `bytehr_enabled` | `1` |
 | `bytehr_api_key` | API key จาก Open API add-on |
-| `bytehr_api_base` | base URL ที่ได้จาก ByteHR ตอนเปิด add-on |
+| `bytehr_api_base` | (ไม่บังคับ) ค่าเริ่มต้น `https://developer.byte-hr.com` — ยืนยันจากการ probe ว่าเป็น API host จริง |
 | `bytehr_monthly_request_budget` | (ไม่บังคับ) ค่าเริ่มต้น `900` |
 | `bytehr_pull_timesheets` | `1` เมื่อต้องการดึงเวลาทำงานด้วย (ปิดไว้โดย default) |
 | `bytehr_pull_pages` | (ไม่บังคับ) หน้าต่อ endpoint ต่อรอบ ค่าเริ่มต้น `3` (×100 รายการ/หน้า) |
