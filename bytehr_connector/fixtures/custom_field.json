@@ -1,0 +1,14 @@
+[
+ {
+  "doctype": "Custom Field",
+  "name": "Employee-bytehr_employee_id",
+  "dt": "Employee",
+  "fieldname": "bytehr_employee_id",
+  "label": "ByteHR Employee ID",
+  "fieldtype": "Data",
+  "read_only": 1,
+  "insert_after": "employee_name",
+  "module": "ByteHR Connector",
+  "no_copy": 1
+ }
+]

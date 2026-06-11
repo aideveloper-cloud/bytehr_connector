@@ -1,0 +1,113 @@
+{
+ "actions": [],
+ "autoname": "format:BHR-TS-{bytehr_id}",
+ "creation": "2026-06-11 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "bytehr_id",
+  "bytehr_employee_id",
+  "employee_name",
+  "date",
+  "clock_in",
+  "clock_out",
+  "hours",
+  "last_synced",
+  "payload"
+ ],
+ "fields": [
+  {
+   "fieldname": "bytehr_id",
+   "fieldtype": "Data",
+   "label": "ByteHR Timesheet ID",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "bytehr_employee_id",
+   "fieldtype": "Data",
+   "label": "ByteHR Employee ID",
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "label": "Employee Name",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "label": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "clock_in",
+   "fieldtype": "Data",
+   "label": "Clock In",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "clock_out",
+   "fieldtype": "Data",
+   "label": "Clock Out",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "hours",
+   "fieldtype": "Float",
+   "label": "Hours",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_synced",
+   "fieldtype": "Datetime",
+   "label": "Last Synced",
+   "read_only": 1
+  },
+  {
+   "fieldname": "payload",
+   "fieldtype": "Code",
+   "label": "Raw Payload (JSON)",
+   "options": "JSON",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-06-11 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ByteHR Connector",
+ "name": "ByteHR Timesheet",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "report": 1
+  },
+  {
+   "role": "HR User",
+   "read": 1,
+   "export": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "employee_name",
+ "track_changes": 0
+}
